@@ -7,13 +7,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set Xcode path (GitHub Runner已预装Xcode)
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Install Dictionary Development Kit
+        run: |
+          # 下载Xcode附加工具（包含Dictionary Development Kit）
+          curl -L -o AdditionalTools.dmg "https://developer.apple.com/services-account/download?path=/Developer_Tools/Additional_Tools_for_Xcode_15/Additional_Tools_for_Xcode_15.dmg"
+          # 挂载镜像
+          hdiutil attach AdditionalTools.dmg
+          # 安装Dictionary Development Kit
+          sudo cp -R "/Volumes/Additional Tools/Dictionary Development Kit/" /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/
+          # 卸载镜像
+          hdiutil detach "/Volumes/Additional Tools"
       
       - name: Build dictionary
         run: |
           mkdir -p ~/Desktop/OutputDict
-          /Applications/Xcode.app/Contents/Developer/usr/bin/dictbuild -o ~/Desktop/OutputDict -i ./Index.xml -b ./Body.html -p ./Info.plist
+          # 使用安装后的dictbuild工具
+          /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Dictionary\ Development\ Kit/bin/dictbuild -o ~/Desktop/OutputDict -i ./Index.xml -b ./Body.html -p ./Info.plist
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
