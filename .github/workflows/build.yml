@@ -6,36 +6,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: 1. 锁定Xcode路径
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-      
-      - name: 2. 下载提前提取好的Dictionary Development Kit（无需dmg）
-        run: |
-          # 用公开仓库的提取好的工具包（已适配macOS 15+ARM）
-          curl -L -o DDK.zip "https://github.com/scriptingosx/DictionaryDevelopmentKit/releases/download/v1.0/DictionaryDevelopmentKit.zip"
-          # 校验文件大小（正常应>2MB）
-          file_size=$(stat -f "%z" DDK.zip)
-          if [ $file_size -lt 2000000 ]; then
-            echo "Error: 工具包下载失败"
-            exit 1
-          fi
-      
-      - name: 3. 解压并安装工具
+      - name: 下载DDK压缩包（无需dmg）
+        run: curl -L -o DDK.zip "https://github.com/scriptingosx/DictionaryDevelopmentKit/releases/download/v1.0/DictionaryDevelopmentKit.zip"
+      - name: 解压并编译
         run: |
           unzip DDK.zip -d /Applications/Xcode.app/Contents/Developer/
-          # 确认工具存在
-          if [ ! -f "/Applications/Xcode.app/Contents/Developer/Dictionary Development Kit/bin/dictbuild" ]; then
-            echo "Error: dictbuild工具未安装成功"
-            exit 1
-          fi
-      
-      - name: 4. 编译词典
-        run: |
           mkdir -p ~/Desktop/OutputDict
           /Applications/Xcode.app/Contents/Developer/Dictionary\ Development\ Kit/bin/dictbuild -o ~/Desktop/OutputDict -i ./Index.xml -b ./Body.html -p ./Info.plist
-      
-      - name: 5. 上传结果
+      - name: 上传结果
         uses: actions/upload-artifact@v4
         with:
           name: custom-dictionary
