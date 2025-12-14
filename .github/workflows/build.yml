@@ -2,29 +2,48 @@ name: Build iOS Dictionary
 on: [push]
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-latest # 自动匹配你的macos-15-arm64 runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Install Dictionary Development Kit（用公开镜像）
+      - name: 1. 安装Xcode命令行工具（基础依赖）
         run: |
-          # 下载公开可访问的Additional Tools镜像（包含Dictionary Development Kit）
-          curl -L -o AdditionalTools.dmg "https://github.com/phracker/MacOSX-SDKs/releases/download/10.15/Additional_Tools_for_Xcode_12.dmg"
-          # 挂载镜像（忽略验证，适配公开镜像）
-          hdiutil attach AdditionalTools.dmg -noverify
-          # 复制Dictionary Development Kit到Xcode工具目录
-          sudo cp -R "/Volumes/Additional Tools/Dictionary Development Kit/" /Applications/Xcode.app/Contents/Developer/
-          # 卸载镜像
-          hdiutil detach "/Volumes/Additional Tools"
+          xcode-select --install || true # 已安装则跳过，避免弹窗卡住
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer # 锁定Xcode路径
       
-      - name: Build dictionary
+      - name: 2. 下载苹果官方Additional Tools（含Dictionary Development Kit）
         run: |
+          # 用苹果官方公开链接（适配macos 15+ARM架构，无需登录）
+          curl -L -o AdditionalTools.dmg "https://developer.apple.com/services-account/download?path=/Developer_Tools/Additional_Tools_for_Xcode_15/Additional_Tools_for_Xcode_15.dmg"
+          # 校验文件大小（避免下载失败，正常应>50MB）
+          file_size=$(stat -f "%z" AdditionalTools.dmg)
+          if [ $file_size -lt 50000000 ]; then
+            echo "Error: 下载的dmg镜像无效（文件过小）"
+            exit 1
+          fi
+      
+      - name: 3. 挂载镜像并安装Dictionary Development Kit
+        run: |
+          # 挂载镜像（忽略签名验证，适配官方镜像）
+          hdiutil attach AdditionalTools.dmg -noverify -mountpoint /Volumes/AdditionalTools
+          # 复制DDK到Xcode工具目录（适配ARM架构路径）
+          sudo cp -R "/Volumes/AdditionalTools/Dictionary Development Kit/" /Applications/Xcode.app/Contents/Developer/
+          # 卸载镜像
+          hdiutil detach /Volumes/AdditionalTools
+      
+      - name: 4. 编译词典（验证工具路径）
+        run: |
+          # 确认dictbuild存在（避免路径错）
+          if [ ! -f "/Applications/Xcode.app/Contents/Developer/Dictionary Development Kit/bin/dictbuild" ]; then
+            echo "Error: dictbuild工具未找到"
+            exit 1
+          fi
+          # 创建输出目录并编译
           mkdir -p ~/Desktop/OutputDict
-          # 调用安装后的dictbuild工具
           /Applications/Xcode.app/Contents/Developer/Dictionary\ Development\ Kit/bin/dictbuild -o ~/Desktop/OutputDict -i ./Index.xml -b ./Body.html -p ./Info.plist
       
-      - name: Upload artifact
+      - name: 5. 上传编译结果
         uses: actions/upload-artifact@v4
         with:
           name: custom-dictionary
